@@ -9,6 +9,7 @@
     getAlbumActions,
     handleRemoveUserFromAlbum,
     handleUpdateUserAlbumRole,
+    isAlbumEditor,
   } from '#lib/services/album.service.ts';
   import {
     AlbumUserRole,
@@ -35,6 +36,7 @@
     () => queryClient,
   );
   const album = $derived(query.data ?? initialAlbum);
+  const canManageSharedLinks = $derived(!readOnly || isAlbumEditor(album));
 
   // TODO: migrate the pending values to optimistic query updates
   const pendingRoles = new SvelteMap<string, AlbumUserRole>();
@@ -135,7 +137,7 @@
           {/each}
         </div>
       </div>
-      {#if !readOnly}
+      {#if canManageSharedLinks}
         <div class="mb-4">
           <HStack class="mb-2 justify-between">
             <Text size="medium" fontWeight="semi-bold">{$t('shared_links')}</Text>

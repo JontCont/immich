@@ -113,8 +113,8 @@ export const getAlbumActions = ($t: MessageFormatter, album: AlbumResponseDto) =
   const Share: ActionItem = {
     title: $t('share'),
     icon: mdiShareVariantOutline,
-    $if: () => isOwned,
-    onAction: () => modalManager.show(AlbumOptionsModal, { album }),
+    $if: () => isEditor,
+    onAction: () => modalManager.show(AlbumOptionsModal, { album, readOnly: !isOwned }),
   };
 
   return { AddUsers, CreateSharedLink, Delete, Download, Edit, Leave, Options, Share };

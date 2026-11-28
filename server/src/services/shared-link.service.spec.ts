@@ -269,11 +269,10 @@ describe(SharedLinkService.name, () => {
 
       await sut.create(AuthFactory.create(owner), { type: SharedLinkType.Album, albumId: album.id });
 
-      expectResourceEvents(
-        mocks,
-        { userIds: [owner.id], changed: [Resource.sharedLinks()] },
-        { userIds: [owner.id, editor.id], changed: [Resource.album(album), Resource.albumStatistics()] },
-      );
+      expectResourceEvents(mocks, {
+        userIds: [owner.id, editor.id],
+        changed: [Resource.sharedLinks(), Resource.album(album), Resource.albumStatistics()],
+      });
     });
 
     it('should tell only the link owner about a new individual link', async () => {
@@ -313,7 +312,7 @@ describe(SharedLinkService.name, () => {
       expect(mocks.sharedLink.update).toHaveBeenCalledWith({
         id: sharedLinkStub.valid.id,
         slug: null,
-        userId: authStub.user1.user.id,
+        userId: sharedLink.userId,
         allowDownload: false,
       });
     });
@@ -374,14 +373,11 @@ describe(SharedLinkService.name, () => {
 
       await sut.remove(AuthFactory.create(owner), sharedLink.id);
 
-      expectResourceEvents(
-        mocks,
-        {
-          userIds: [owner.id, editor.id],
-          changed: [Resource.album(album), Resource.albumStatistics()],
-        },
-        { userIds: [owner.id], deleted: [Resource.sharedLink(sharedLink)] },
-      );
+      expectResourceEvents(mocks, {
+        userIds: [owner.id, editor.id],
+        changed: [Resource.album(album), Resource.albumStatistics()],
+        deleted: [Resource.sharedLink(sharedLink)],
+      });
     });
   });
 

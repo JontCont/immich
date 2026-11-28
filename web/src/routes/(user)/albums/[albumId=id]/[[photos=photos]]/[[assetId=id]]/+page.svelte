@@ -325,7 +325,7 @@
               {/if}
 
               <!-- ALBUM SHARING -->
-              {#if album.albumUsers.length > 1 || (album.hasSharedLink && isOwned)}
+              {#if album.albumUsers.length > 1 || (album.hasSharedLink && isEditor)}
                 <div class="my-3 flex gap-x-1">
                   <button
                     class="flex gap-x-1"
@@ -348,7 +348,7 @@
                       />
                     {/if}
 
-                    {#if album.hasSharedLink && isOwned}
+                    {#if album.hasSharedLink && isEditor}
                       <IconButton
                         aria-label={$t('shared_link_manage_links')}
                         color="secondary"

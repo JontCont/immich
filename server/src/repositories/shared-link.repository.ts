@@ -87,7 +87,25 @@ export class SharedLinkRepository {
       )
       .select((eb) => eb.fn.toJson(eb.table('album')).$castTo<ShallowDehydrateObject<Album> | null>().as('album'))
       .where('shared_link.id', '=', id)
-      .where('shared_link.userId', '=', userId)
+      .where((eb) =>
+        eb.or([
+          eb('shared_link.userId', '=', userId),
+          eb.and([
+            eb('shared_link.type', '=', SharedLinkType.Album),
+            eb.exists(
+              eb
+                .selectFrom('album_user')
+                .innerJoin('user', (join) =>
+                  join.onRef('user.id', '=', 'album_user.userId').on('user.deletedAt', 'is', null),
+                )
+                .whereRef('album_user.albumId', '=', 'shared_link.albumId')
+                .where('album_user.userId', '=', userId)
+                .where('album_user.role', 'in', [AlbumUserRole.Owner, AlbumUserRole.Editor])
+                .select(sql.lit(1).as('match')),
+            ),
+          ]),
+        ]),
+      )
       .where((eb) => eb.or([eb('shared_link.type', '=', SharedLinkType.Individual), eb('album.id', 'is not', null)]))
       .orderBy('shared_link.createdAt', 'desc')
       .executeTakeFirst();
@@ -141,7 +159,25 @@ export class SharedLinkRepository {
             ).as('assets'),
           ),
       )
-      .where('shared_link.userId', '=', userId)
+      .$if(!albumId, (eb) => eb.where('shared_link.userId', '=', userId))
+      .$if(!!albumId, (eb) =>
+        eb.where((wb) =>
+          wb.or([
+            wb('shared_link.userId', '=', userId),
+            wb.exists(
+              wb
+                .selectFrom('album_user')
+                .innerJoin('user', (join) =>
+                  join.onRef('user.id', '=', 'album_user.userId').on('user.deletedAt', 'is', null),
+                )
+                .whereRef('album_user.albumId', '=', 'shared_link.albumId')
+                .where('album_user.userId', '=', userId)
+                .where('album_user.role', 'in', [AlbumUserRole.Owner, AlbumUserRole.Editor])
+                .select(sql.lit(1).as('match')),
+            ),
+          ]),
+        ),
+      )
       .leftJoinLateral(
         (eb) => withSharedLinkAlbum(eb).select(withAlbumOwner).as('album'),
         (join) => join.onTrue(),

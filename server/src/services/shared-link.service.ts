@@ -105,13 +105,14 @@ export class SharedLinkService extends BaseService {
         showExif: dto.showMetadata ?? true,
         slug: dto.slug || null,
       });
-      this.resourceRepository.send({ userIds: [auth.user.id], changed: [Resource.sharedLinks()] });
       if (sharedLink.albumId) {
         const userIds = await this.albumRepository.getUserIds(sharedLink.albumId);
         this.resourceRepository.send({
           userIds,
-          changed: [Resource.album({ id: sharedLink.albumId }), Resource.albumStatistics()],
+          changed: [Resource.sharedLinks(), Resource.album({ id: sharedLink.albumId }), Resource.albumStatistics()],
         });
+      } else {
+        this.resourceRepository.send({ userIds: [auth.user.id], changed: [Resource.sharedLinks()] });
       }
 
       return mapSharedLink(sharedLink, { auth });
@@ -129,11 +130,11 @@ export class SharedLinkService extends BaseService {
   }
 
   async update(auth: AuthDto, id: string, dto: SharedLinkEditDto) {
-    await this.findOrFail(auth.user.id, id);
+    const existing = await this.findOrFail(auth.user.id, id);
     try {
       const sharedLink = await this.sharedLinkRepository.update({
         id,
-        userId: auth.user.id,
+        userId: existing.userId,
         description: dto.description,
         password: dto.password,
         expiresAt: dto.expiresAt,
@@ -142,7 +143,8 @@ export class SharedLinkService extends BaseService {
         showExif: dto.showMetadata,
         slug: dto.slug || null,
       });
-      this.resourceRepository.send({ userIds: [auth.user.id], changed: [Resource.sharedLink({ id })] });
+      const userIds = sharedLink.albumId ? await this.albumRepository.getUserIds(sharedLink.albumId) : [auth.user.id];
+      this.resourceRepository.send({ userIds, changed: [Resource.sharedLink({ id })] });
       return mapSharedLink(sharedLink, { auth });
     } catch (error) {
       this.handleError(error);
@@ -152,8 +154,8 @@ export class SharedLinkService extends BaseService {
   async remove(auth: AuthDto, id: string): Promise<void> {
     const sharedLink = await this.findOrFail(auth.user.id, id);
     await this.sharedLinkRepository.remove(sharedLink.id);
-    this.resourceRepository.send({ userIds: [auth.user.id], deleted: [Resource.sharedLink({ id })] });
     if (!sharedLink.albumId) {
+      this.resourceRepository.send({ userIds: [auth.user.id], deleted: [Resource.sharedLink({ id })] });
       return;
     }
 
@@ -161,6 +163,7 @@ export class SharedLinkService extends BaseService {
     this.resourceRepository.send({
       userIds,
       changed: [Resource.album({ id: sharedLink.albumId }), Resource.albumStatistics()],
+      deleted: [Resource.sharedLink({ id })],
     });
   }
 
