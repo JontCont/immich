@@ -1,0 +1,74 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '0 20 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync Upstream Main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Token
+        env:
+          SYNC_PAT: ${{ secrets.SYNC_PAT }}
+        run: |
+          if [[ -z "$SYNC_PAT" ]]; then
+            echo "::error::Required Actions secret SYNC_PAT is not configured."
+            exit 1
+          fi
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: releases/dev
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_PAT }}
+
+      - name: Fetch and Merge Upstream Main
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream https://github.com/immich-app/immich.git
+          git fetch upstream main
+
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "updated=false" >> "$GITHUB_OUTPUT"
+            echo "Already up to date with upstream/main."
+            exit 0
+          fi
+
+          set +e
+          git merge --no-commit --no-ff upstream/main
+          set -e
+
+          find .github/workflows -type f \
+            ! -name 'deploy.yml' \
+            ! -name 'sync-upstream.yml' \
+            -print0 | xargs -0 -r git rm -f --ignore-unmatch
+
+          git diff --name-only --diff-filter=U -- .github/workflows \
+            | xargs -r git rm -f --ignore-unmatch
+
+          unmerged=$(git diff --name-only --diff-filter=U)
+          if [[ -n "$unmerged" ]]; then
+            echo "::error::Merge conflicts detected outside .github/workflows:"
+            echo "$unmerged"
+            git merge --abort
+            exit 1
+          fi
+
+          short_sha=$(git rev-parse --short upstream/main)
+          git commit -m "chore: sync upstream main (${short_sha})"
+          git push origin releases/dev
+          echo "updated=true" >> "$GITHUB_OUTPUT"
